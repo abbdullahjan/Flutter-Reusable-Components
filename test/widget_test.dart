@@ -11,20 +11,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:reusable_flutter_components/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('push test screen exposes token and message actions', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const MyApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Push Notification Test'), findsOneWidget);
+    expect(find.text('FCM device token'), findsOneWidget);
+    expect(find.text('Copy FCM token'), findsOneWidget);
+    expect(find.text('Register with backend'), findsOneWidget);
+    expect(find.text('Send test notification now'), findsOneWidget);
+    expect(find.text('No events yet.'), findsOneWidget);
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+      isNull,
+    );
   });
 }
