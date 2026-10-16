@@ -1,30 +1,38 @@
-// This is a basic Flutter widget test.
+// Smoke tests for the minimal demo host application in `lib/main.dart`.
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// The original counter test was replaced together with the counter demo that
+// used to live in `main.dart`. The demo app now exposes the extracted auth
+// module, which is what these tests verify.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:reusable_flutter_components/core/auth/auth.dart';
 import 'package:reusable_flutter_components/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('demo app shows entry points to the auth module', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const MyApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('Open login screen'), findsOneWidget);
+    expect(find.text('Open signup screen'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('demo app opens the login screen', (WidgetTester tester) async {
+    await tester.pumpWidget(const MyApp());
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await tester.tap(find.text('Open login screen'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoginScreen), findsOneWidget);
+  });
+
+  testWidgets('demo app opens the signup screen', (WidgetTester tester) async {
+    await tester.pumpWidget(const MyApp());
+
+    await tester.tap(find.text('Open signup screen'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SignupScreen), findsOneWidget);
   });
 }
