@@ -1,9 +1,10 @@
-// Smoke tests for the minimal demo host application in `lib/main.dart`.
+// Smoke tests for the demo host application in `lib/main.dart`.
 //
-// The original counter test was replaced together with the counter demo that
-// used to live in `main.dart`. The demo app now exposes the extracted auth
-// module, which is what these tests verify.
+// The demo app exposes both the extracted auth module and the push
+// notification test screen, so these tests cover the entry points and the
+// visible push-notification actions of the merged demo.
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:reusable_flutter_components/core/auth/auth.dart';
 import 'package:reusable_flutter_components/main.dart';
@@ -34,5 +35,22 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(SignupScreen), findsOneWidget);
+  });
+
+  testWidgets('push test screen exposes token and message actions', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+
+    expect(find.text('Push Notification Test'), findsOneWidget);
+    expect(find.text('FCM device token'), findsOneWidget);
+    expect(find.text('Copy FCM token'), findsOneWidget);
+    expect(find.text('Register with backend'), findsOneWidget);
+    expect(find.text('Send test notification now'), findsOneWidget);
+    expect(find.text('No events yet.'), findsOneWidget);
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+      isNull,
+    );
   });
 }

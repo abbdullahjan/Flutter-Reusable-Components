@@ -1,21 +1,35 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'core/auth/auth.dart';
 import 'services/flutter_firebase_auth/firebase.dart';
+import 'services/push_service.dart';
+
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
 
 /// Minimal demonstration host application for the reusable authentication
-/// module. It shows how a real app opens the login/signup screens and reacts to
-/// successful authentication. The module itself never imports this file.
+/// module and the push-notification service. It shows how a real app opens the
+/// login/signup screens, reacts to successful authentication and exercises FCM.
+/// The module itself never imports this file.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   try {
     await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    await PushService.initialize();
   } catch (error) {
-    // The demo still runs without Firebase configuration; authentication
-    // attempts will then report a failure instead of crashing.
+    // The demo still runs without Firebase configuration; push and
+    // authentication attempts then report a failure instead of crashing.
+    PushService.reportInitializationError(error);
     debugPrint('Firebase is not configured for this demo app: $error');
   }
+
   runApp(const MyApp());
 }
 
@@ -40,9 +54,11 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Reusable Auth Demo',
+      scaffoldMessengerKey: PushService.messengerKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+        useMaterial3: true,
       ),
       home: const DemoHomeScreen(),
     );
@@ -56,50 +72,141 @@ class DemoHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Reusable auth demo')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Icon(
-                  Icons.flutter_dash,
-                  size: 72,
-                  color: theme.colorScheme.primary,
+      appBar: AppBar(title: const Text('Push Notification Test')),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Reusable authentication',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: () => _openLogin(context),
+                        icon: const Icon(Icons.login),
+                        label: const Text('Open login screen'),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: () => _openSignup(context),
+                        icon: const Icon(Icons.person_add_alt),
+                        label: const Text('Open signup screen'),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Extracted login and signup module',
-                  style: theme.textTheme.titleLarge,
-                  textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'FCM device token',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      ValueListenableBuilder<String?>(
+                        valueListenable: PushService.token,
+                        builder: (context, token, _) => SelectableText(
+                          token ?? 'Waiting for Firebase setup...',
+                          maxLines: token == null ? 2 : 4,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ValueListenableBuilder<String?>(
+                        valueListenable: PushService.token,
+                        builder: (context, token, _) => FilledButton.icon(
+                          onPressed: token == null
+                              ? null
+                              : () async {
+                                  await Clipboard.setData(
+                                    ClipboardData(text: token),
+                                  );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('FCM token copied'),
+                                      ),
+                                    );
+                                  }
+                                },
+                          icon: const Icon(Icons.copy),
+                          label: const Text('Copy FCM token'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'The demo injects FirebaseAuthService() explicitly (from '
-                  'services/flutter_firebase_auth/firebase.dart). Add your '
-                  'Firebase configuration '
-                  '(google-services.json / firebase_options.dart) to '
-                  'authenticate for real.',
-                  style: theme.textTheme.bodySmall,
-                  textAlign: TextAlign.center,
+              ),
+              ValueListenableBuilder<String>(
+                valueListenable: PushService.status,
+                builder: (context, status, _) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.info_outline),
+                  title: const Text('Status'),
+                  subtitle: Text(status),
                 ),
-                const SizedBox(height: 32),
-                AuthButton(
-                  label: 'Open login screen',
-                  icon: Icons.login,
-                  onPressed: () => _openLogin(context),
+              ),
+              const SizedBox(height: 8),
+              ValueListenableBuilder<String?>(
+                valueListenable: PushService.token,
+                builder: (context, token, _) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    OutlinedButton(
+                      onPressed: token == null ? null : PushService.register,
+                      child: const Text('Register with backend'),
+                    ),
+                    OutlinedButton(
+                      onPressed: token == null
+                          ? null
+                          : () => PushService.sendTest(),
+                      child: const Text('Send test notification now'),
+                    ),
+                    OutlinedButton(
+                      onPressed: token == null
+                          ? null
+                          : () => PushService.sendTest(delayMs: 8000),
+                      child: const Text('Send in 8 seconds (background test)'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                AuthButton(
-                  label: 'Open signup screen',
-                  icon: Icons.person_add_alt,
-                  onPressed: () => _openSignup(context),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+              Text('Event log', style: theme.textTheme.titleMedium),
+              const Divider(),
+              ValueListenableBuilder<List<String>>(
+                valueListenable: PushService.log,
+                builder: (context, entries, _) {
+                  if (entries.isEmpty) {
+                    return const Text('No events yet.');
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: entries
+                        .map(
+                          (entry) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Text(entry),
+                          ),
+                        )
+                        .toList(),
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),
